@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive 3D Car Explorer</title>
+<style>
+:root{--bg:#080d18;--panel:rgba(14,23,40,.88);--line:rgba(130,175,255,.2);--cyan:#72e5ff;--muted:#9aabc5}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#edf5ff;font-family:system-ui,Arial,sans-serif;overflow:hidden}
+#scene{position:fixed;inset:0}
+.hud{position:fixed;z-index:2;left:14px;top:14px;right:14px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;pointer-events:none}
+.brand,.panel,.controls{background:var(--panel);border:1px solid var(--line);backdrop-filter:blur(14px);border-radius:15px;box-shadow:0 12px 36px #0006}
+.brand{padding:12px 15px}.brand b{letter-spacing:2px;color:var(--cyan);font-size:13px}.brand div{font-size:11px;color:var(--muted);margin-top:4px}
+.panel{padding:12px;width:min(310px,48vw);pointer-events:auto}.panel h2{font-size:14px;margin:0 0 8px}.panel p{font-size:12px;line-height:1.5;color:#b9c7dc;margin:0}
+.controls{position:fixed;z-index:3;bottom:14px;left:50%;transform:translateX(-50%);padding:10px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100vw - 24px)}
+button{background:#14243a;border:1px solid #34506e;color:#eaf6ff;border-radius:10px;padding:10px 13px;font-weight:650;font-size:12px}
+button.active{background:#123c50;border-color:var(--cyan);color:var(--cyan)}button:active{transform:scale(.97)}
+#hint{position:fixed;bottom:82px;left:50%;transform:translateX(-50%);font-size:11px;color:#9aabc5;background:#0b1424cc;padding:7px 12px;border-radius:20px;white-space:nowrap}
+#loading{position:fixed;inset:0;display:grid;place-items:center;background:#080d18;z-index:5;color:var(--cyan);font-size:14px}
+@media(max-width:600px){.hud{flex-wrap:wrap}.panel{width:100%;max-width:100%}.controls{bottom:10px}.controls button{padding:9px 10px}#hint{bottom:75px}}
+</style>
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+</head>
+<body>
+<div id="loading">Loading 3D Car Explorer…</div>
+<div id="scene"></div>
+<div class="hud">
+  <div class="brand"><b>3D CAR EXPLORER</b><div>REALISTIC-STYLE • INTERACTIVE MODEL</div></div>
+  <div class="panel"><h2 id="title">Exterior view</h2><p id="description">Drag to rotate • Pinch or scroll to zoom. Switch to Engine view to reveal the mechanical parts under the hood.</p></div>
+</div>
+<div id="hint">Drag to rotate · Pinch to zoom · Tap a mode</div>
+<div class="controls">
+  <button id="exterior" class="active">Exterior</button>
+  <button id="engine">Engine view</button>
+  <button id="cycle">Engine cycle: OFF</button>
+  <button id="reset">Reset camera</button>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const host=document.getElementById('scene');
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x080d18);
+scene.fog=new THREE.Fog(0x080d18,18,42);
+const camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,100);
+camera.position.set(7,5.1,9);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+host.appendChild(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.target.set(0,1,0);controls.minDistance=4;controls.maxDistance=19;controls.maxPolarAngle=Math.PI*.49;
+
+scene.add(new THREE.HemisphereLight(0xb9d8ff,0x20283a,2));
+const key=new THREE.DirectionalLight(0xffffff,3.2);key.position.set(6,10,7);key.castShadow=true;key.shadow.mapSize.set(2048,2048);scene.add(key);
+const rim=new THREE.DirectionalLight(0x4e9dff,2);rim.position.set(-7,4,-5);scene.add(rim);
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x101827,roughness:.85}));
+floor.rotation.x=-Math.PI/2;floor.position.y=-.03;floor.receiveShadow=true;scene.add(floor);
+const grid=new THREE.GridHelper(40,40,0x29415e,0x1b2a40);grid.position.y=-.015;scene.add(grid);
+
+const car=new THREE.Group();scene.add(car);
+const body=new THREE.Group();car.add(body);
+const engineGroup=new THREE.Group();car.add(engineGroup);
+const paint=new THREE.MeshPhysicalMaterial({color:0x9e1825,metalness:.72,roughness:.24,clearcoat:1,clearcoatRoughness:.12});
+const dark=new THREE.MeshStandardMaterial({color:0x111923,metalness:.55,roughness:.38});
+const glass=new THREE.MeshPhysicalMaterial({color:0x172d42,metalness:.25,roughness:.12,transparent:true,opacity:.78,clearcoat:1});
+const rubber=new THREE.MeshStandardMaterial({color:0x080a0e,roughness:.92});
+const alloy=new THREE.MeshStandardMaterial({color:0xb8c5d3,metalness:.88,roughness:.22});
+const lamp=new THREE.MeshStandardMaterial({color:0xc8f2ff,emissive:0x70cfff,emissiveIntensity:1.7});
+function matBox(parent,w,h,d,x,y,z,material,bevel=.08){
+ const g=new THREE.BoxGeometry(w,h,d);const m=new THREE.Mesh(g,material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m;
+}
+function wheel(x,z){
+ const g=new THREE.Group();g.position.set(x,.62,z);body.add(g);
+ const tire=new THREE.Mesh(new THREE.CylinderGeometry(.59,.59,.34,40),rubber);tire.rotation.z=Math.PI/2;tire.castShadow=true;g.add(tire);
+ const rim=new THREE.Mesh(new THREE.CylinderGeometry(.37,.37,.355,32),alloy);rim.rotation.z=Math.PI/2;g.add(rim);
+ const hub=new THREE.Mesh(new THREE.CylinderGeometry(.105,.105,.37,24),dark);hub.rotation.z=Math.PI/2;g.add(hub);
+ for(let i=0;i<10;i++){const a=i*Math.PI/5;const spoke=matBox(g,.045,.57,.055,0,Math.cos(a)*.0,0,alloy);spoke.rotation.x=a;spoke.position.set(0,Math.sin(a)*.22,Math.cos(a)*.22);}
+}
+function makeCar(){
+ // Lower chassis and sculpted body volumes
+ matBox(body,2.05,.48,4.55,0,.78,0,paint);
+ matBox(body,2.18,.38,1.1,0,.92,1.72,paint);
+ matBox(body,2.12,.34,1.0,0,.88,-1.72,paint);
+ // Cabin, roof and windows
+ const cabin=new THREE.Group();body.add(cabin);
+ const cabMesh=matBox(cabin,1.62,.9,2.15,0,1.48,-.05,glass);
+ const roof=matBox(cabin,1.55,.16,1.55,0,1.99,-.1,paint);
+ // window frame pillars
+ for(const x of [-.82,.82])for(const z of [-.82,.78])matBox(cabin,.09,.88,.1,x,1.49,z,dark);
+ // hood and trunk details
+ matBox(body,1.88,.12,1.28,0,1.08,1.55,paint);
+ matBox(body,1.82,.1,.88,0,1.06,-1.75,paint);
+ // bumpers, grille
+ matBox(body,1.75,.2,.18,0,.62,2.29,dark);
+ matBox(body,1.05,.22,.06,0,.79,2.34,dark);
+ // front headlights
+ for(const x of [-.72,.72]){const h=matBox(body,.42,.13,.09,x,1.0,2.26,lamp);h.rotation.z=-x*.12;}
+ // rear lights
+ for(const x of [-.76,.76])matBox(body,.35,.12,.08,x,1.0,-2.29,new THREE.MeshStandardMaterial({color:0x9d1018,emissive:0x550008}));
+ // mirrors
+ for(const x of [-1.12,1.12])matBox(body,.22,.13,.24,x,1.45,.55,dark);
+ // wheels
+ wheel(-1.02,1.42);wheel(1.02,1.42);wheel(-1.02,-1.42);wheel(1.02,-1.42);
+ // side skirts
+ for(const x of [-1.02,1.02])matBox(body,.12,.16,2.6,x,.55,0,dark);
+}
+makeCar();
+
+// Engine assembly, positioned at front of vehicle; engine is exposed in engine mode
+const metal=new THREE.MeshStandardMaterial({color:0x9ca9b8,metalness:.82,roughness:.3});
+const blockMat=new THREE.MeshStandardMaterial({color:0x343e4c,metalness:.72,roughness:.38});
+const copper=new THREE.MeshStandardMaterial({color:0xb56c37,metalness:.72,roughness:.27});
+const pistonParts=[];
+const engineBase=new THREE.Group();engineGroup.add(engineBase);engineBase.position.set(0,1.35,1.45);
+matBox(engineBase,1.35,.85,1.5,0,0,0,blockMat);
+matBox(engineBase,1.48,.16,1.55,0,.49,0,metal);
+matBox(engineBase,1.2,.16,1.35,0,-.5,0,dark);
+for(let i=0;i<4;i++){
+ const z=-.52+i*.35;
+ const cyl=new THREE.Mesh(new THREE.CylinderGeometry(.19,.19,.82,28),metal);cyl.position.set(0,.88,z);engineBase.add(cyl);
+ const piston=new THREE.Mesh(new THREE.CylinderGeometry(.145,.145,.16,24),alloy);piston.position.set(0,.7,z);piston.castShadow=true;engineBase.add(piston);pistonParts.push(piston);
+ const rod=new THREE.Mesh(new THREE.CylinderGeometry(.045,.045,.48,16),copper);rod.position.set(0,.36,z);engineBase.add(rod);pistonParts.push(rod);
+}
+const crank=new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,1.45,24),copper);crank.rotation.z=Math.PI/2;crank.position.set(0,-.22,0);engineBase.add(crank);
+for(let i=0;i<4;i++){const cap=matBox(engineBase,.35,.12,.22,0,-.58,-.52+i*.35,metal);}
+// intake manifold tubes
+for(let i=0;i<4;i++){const pipe=new THREE.Mesh(new THREE.TorusGeometry(.18,.045,10,24,Math.PI),copper);pipe.rotation.x=Math.PI/2;pipe.position.set(.52,.45,-.52+i*.35);engineBase.add(pipe);}
+// front radiator and fan
+matBox(engineBase,1.35,.68,.12,0,-.05,.88,dark);
+const fan=new THREE.Group();engineBase.add(fan);fan.position.set(0,-.05,.97);
+const hub=new THREE.Mesh(new THREE.CylinderGeometry(.13,.13,.1,24),alloy);hub.rotation.x=Math.PI/2;fan.add(hub);
+for(let i=0;i<7;i++){const blade=matBox(fan,.09,.58,.045,0,.29,0,metal);blade.rotation.z=i*Math.PI*2/7;}
+
+// Labels are 3D sprites
+function label(text,x,y,z){
+ const c=document.createElement('canvas');c.width=512;c.height=128;const ctx=c.getContext('2d');
+ ctx.fillStyle='#071321';ctx.fillRect(0,0,512,128);ctx.strokeStyle='#72e5ff';ctx.lineWidth=5;ctx.strokeRect(4,4,504,120);
+ ctx.font='bold 42px Arial';ctx.fillStyle='#dff8ff';ctx.textAlign='center';ctx.fillText(text,256,82);
+ const tex=new THREE.CanvasTexture(c);const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true}));s.scale.set(2.2,.55,1);s.position.set(x,y,z);engineBase.add(s);return s;
+}
+label('INLINE 4 ENGINE',0,1.65,0);
+engineGroup.visible=false;
+
+let mode='exterior',running=false;
+function setMode(m){
+ mode=m;body.visible=m==='exterior';engineGroup.visible=m==='engine';
+ document.getElementById('exterior').classList.toggle('active',m==='exterior');
+ document.getElementById('engine').classList.toggle('active',m==='engine');
+ document.getElementById('title').textContent=m==='exterior'?'Exterior view':'Engine view';
+ document.getElementById('description').textContent=m==='exterior'?'Explore the full sports sedan body. Drag to rotate and pinch to zoom.':'Simplified inline-four engine: pistons move inside cylinders. Turn on Engine cycle to animate the mechanism.';
+ controls.target.set(0,m==='exterior'?1:1.4,m==='exterior'?0:1.4);
+}
+document.getElementById('exterior').onclick=()=>setMode('exterior');
+document.getElementById('engine').onclick=()=>setMode('engine');
+document.getElementById('cycle').onclick=()=>{running=!running;document.getElementById('cycle').textContent='Engine cycle: '+(running?'ON':'OFF');document.getElementById('cycle').classList.toggle('active',running);if(mode!=='engine')setMode('engine');};
+document.getElementById('reset').onclick=()=>{camera.position.set(7,5.1,9);controls.target.set(0,1,0);controls.update();};
+const clock=new THREE.Clock();
+function animate(){
+ requestAnimationFrame(animate);const t=clock.getElapsedTime();
+ if(running){pistonParts.forEach((p,i)=>{const cyl=Math.floor(i/2);const phase=t*5+cyl*Math.PI; if(i%2===0)p.position.y=.7+Math.sin(phase)*.2;else p.position.y=.36+Math.sin(phase)*.1;});fan.rotation.z=t*8;}
+ controls.update();renderer.render(scene,camera);
+}
+animate();
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);});
+document.getElementById('loading').remove();
+</script>
+</body></html>
