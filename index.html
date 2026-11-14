@@ -3,94 +3,142 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>3D Sports Car Viewer</title>
+    <title>3D Interactive Solar System</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #050b14; font-family: sans-serif; color: #00f3ff; }
+        body { margin: 0; overflow: hidden; background-color: #000000; font-family: sans-serif; color: #00f3ff; }
         canvas { display: block; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 1; }
-        #ui { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 10; background: rgba(5, 11, 20, 0.9); padding: 12px; border: 1px solid #00f3ff; border-radius: 8px; box-shadow: 0 0 15px rgba(0,243,255,0.3); max-width: 300px; margin: 0 auto; text-align: center; }
-        h1 { font-size: 13px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 1px; }
-        #loading { font-size: 12px; color: #ffaa00; margin-top: 5px; }
+        #ui { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 10; background: rgba(5, 5, 10, 0.85); padding: 12px; border: 1px solid #00f3ff; border-radius: 8px; box-shadow: 0 0 15px rgba(0,243,255,0.3); max-width: 280px; margin: 0 auto; text-align: center; backdrop-filter: blur(5px); }
+        h1 { font-size: 13px; margin: 0 0 5px 0; text-transform: uppercase; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px #00f3ff; }
         #instructions { position: absolute; bottom: 10px; left: 10px; right: 10px; font-size: 11px; opacity: 0.85; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 5px; border: 1px solid #113355; text-align: center; z-index: 10; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <h1>3D Sports Car</h1>
-        <div id="loading">লোডিং হচ্ছে, একটু অপেক্ষা করুন...</div>
+        <h1>Solar System 3D</h1>
+        <div style="font-size: 11px; color: #88ccff;">সূর্য ও সকল গ্রহ প্রদক্ষিণরত</div>
     </div>
-    <div id="instructions">👉 আঙুল দিয়ে ড্র্যাগ করে গাড়ি ঘুরিয়ে দেখুন | জুম ইন/আউট করুন</div>
+    <div id="instructions">👉 আঙুল দিয়ে ড্র্যাগ করে মহাশূন্য ঘুরে দেখুন | জুম করুন</div>
 
-    <!-- Three.js & GLTFLoader CDN -->
+    <!-- Three.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script>
+        // Scene setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x050b14);
-        scene.fog = new THREE.FogExp2(0x050b14, 0.02);
 
-        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(5, 2, 5);
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 50, 100);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.outputEncoding = THREE.sRGBEncoding;
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
-        controls.maxPolarAngle = Math.PI / 2 - 0.05; // Prevent camera going below ground
+        controls.dampingFactor = 0.05;
+        controls.maxDistance = 500;
 
-        const gridHelper = new THREE.GridHelper(50, 50, 0x00f3ff, 0x113355);
-        gridHelper.position.y = -0.5;
-        scene.add(gridHelper);
-
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
+        // Ambient & Sun Light
+        const ambientLight = new THREE.AmbientLight(0x333333);
         scene.add(ambientLight);
 
-        const directionalLight = new THREE.DirectionalLight(0x00f3ff, 2.0);
-        directionalLight.position.set(10, 20, 10);
-        scene.add(directionalLight);
+        const sunLight = new THREE.PointLight(0xffffff, 2, 500);
+        scene.add(sunLight);
 
-        const pointLight = new THREE.PointLight(0xffaa00, 2, 50);
-        pointLight.position.set(-10, 5, -10);
-        scene.add(pointLight);
+        // Starry Background (অন্ধকার মহাশূন্য ও তারা)
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsCount = 2000;
+        const starPositions = new Float32Array(starsCount * 3);
 
-        // Load Real 3D Car Model
-        const loader = new THREE.GLTFLoader();
-        // Using a standard open-source low-poly car model from Three.js examples
-        loader.load(
-            'https://threejs.org/examples/models/gltf/Ferrari.glb',
-            function (gltf) {
-                const car = gltf.scene;
-                car.position.set(0, -0.5, 0);
-                car.scale.set(0.8, 0.8, 0.8);
-                scene.add(car);
-                
-                document.getElementById('loading').innerText = 'লোড সফল হয়েছে!';
-                setTimeout(() => {
-                    document.getElementById('loading').style.display = 'none';
-                }, 2000);
-            },
-            function (xhr) {
-                let percent = Math.floor((xhr.loaded / xhr.total) * 100);
-                if(percent) document.getElementById('loading').innerText = `লোড হচ্ছে: ${percent}%`;
-            },
-            function (error) {
-                console.error(error);
-                document.getElementById('loading').innerText = 'মডেল লোড করতে সমস্যা হয়েছে!';
+        for(let i = 0; i < starsCount * 3; i++) {
+            starPositions[i] = (Math.random() - 0.5) * 1000;
+        }
+
+        starsGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 1.2 });
+        const starField = new THREE.Points(starsGeometry, starsMaterial);
+        scene.add(starField);
+
+        // Sun (সূর্য)
+        const sunGeo = new THREE.SphereGeometry(6, 32, 32);
+        const sunMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+        const sun = new THREE.Mesh(sunGeo, sunMat);
+        scene.add(sun);
+
+        // Sun Glow Effect
+        const sunGlowGeo = new THREE.SphereGeometry(6.8, 32, 32);
+        const sunGlowMat = new THREE.MeshBasicMaterial({ color: 0xff5500, transparent: true, opacity: 0.3 });
+        const sunGlow = new THREE.Mesh(sunGlowGeo, sunGlowMat);
+        scene.add(sunGlow);
+
+        // Planets Data (দূরত্ব, আকার, গতি, রঙ)
+        const planetData = [
+            { name: "Mercury", radius: 0.8, distance: 12, speed: 0.04, color: 0x888888 },
+            { name: "Venus", radius: 1.4, distance: 18, speed: 0.015, color: 0xe3bb76 },
+            { name: "Earth", radius: 1.6, distance: 26, speed: 0.01, color: 0x2277ff },
+            { name: "Mars", radius: 1.0, distance: 34, speed: 0.008, color: 0xcc4400 },
+            { name: "Jupiter", radius: 3.5, distance: 48, speed: 0.004, color: 0xd4a373 },
+            { name: "Saturn", radius: 2.8, distance: 64, speed: 0.002, color: 0xf4e2bb, hasRing: true },
+            { name: "Uranus", radius: 2.0, distance: 78, speed: 0.0012, color: 0x77ddff },
+            { name: "Neptune", radius: 1.9, distance: 90, speed: 0.0008, color: 0x3333cc }
+        ];
+
+        const planets = [];
+
+        planetData.forEach(data => {
+            // Orbit Line (কক্ষপথের রেখা)
+            const orbitGeo = new THREE.BufferGeometry();
+            const points = [];
+            for (let i = 0; i <= 64; i++) {
+                const theta = (i / 64) * Math.PI * 2;
+                points.push(new THREE.Vector3(Math.cos(theta) * data.distance, 0, Math.sin(theta) * data.distance));
             }
-        );
+            orbitGeo.setFromPoints(points);
+            const orbitMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 });
+            const orbitLine = new THREE.Line(orbitGeo, orbitMat);
+            scene.add(orbitLine);
 
+            // Planet Mesh
+            const planetGeo = new THREE.SphereGeometry(data.radius, 32, 32);
+            const planetMat = new THREE.MeshStandardMaterial({ color: data.color, roughness: 0.7 });
+            const planet = new THREE.Mesh(planetGeo, planetMat);
+
+            // Saturn Rings (শনি গ্রহের রিং)
+            if (data.hasRing) {
+                const ringGeo = new THREE.RingGeometry(data.radius + 0.8, data.radius + 2.5, 32);
+                ringGeo.rotateX(Math.PI / 2);
+                const ringMat = new THREE.MeshBasicMaterial({ color: 0xccb88a, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+                const ring = new THREE.Mesh(ringGeo, ringMat);
+                planet.add(ring);
+            }
+
+            scene.add(planet);
+            planets.push({ mesh: planet, distance: data.distance, speed: data.speed, angle: Math.random() * Math.PI * 2 });
+        });
+
+        // Window resize handler
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
+        // Animation Loop (গ্রহ ঘোরানো)
         function animate() {
             requestAnimationFrame(animate);
+
+            // Rotate Sun
+            sun.rotation.y += 0.002;
+
+            // Orbit Planets
+            planets.forEach(planet => {
+                planet.angle += planet.speed;
+                planet.mesh.position.x = Math.cos(planet.angle) * planet.distance;
+                planet.mesh.position.z = Math.sin(planet.angle) * planet.distance;
+                planet.mesh.rotation.y += 0.02; // নিজ অক্ষে ঘূর্ণন
+            });
+
             controls.update();
             renderer.render(scene, camera);
         }
