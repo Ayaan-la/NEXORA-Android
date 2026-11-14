@@ -2,30 +2,31 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>BMW M4 3D Blueprint & Engine Simulation</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #050b14; font-family: sans-serif; color: #00f3ff; }
-        #ui { position: absolute; top: 15px; left: 15px; z-index: 10; background: rgba(5, 11, 20, 0.9); padding: 18px; border: 1px solid #00f3ff; border-radius: 8px; box-shadow: 0 0 20px rgba(0,243,255,0.3); }
-        h1 { font-size: 15px; margin: 0 0 12px 0; text-transform: uppercase; letter-spacing: 2px; }
-        button { background: transparent; color: #00f3ff; border: 1px solid #00f3ff; padding: 8px 12px; margin: 6px 0; cursor: pointer; border-radius: 4px; display: block; width: 100%; transition: 0.3s; font-weight: bold; font-size: 13px; }
-        button:hover { background: #00f3ff; color: #050b14; box-shadow: 0 0 12px #00f3ff; }
-        #instructions { position: absolute; bottom: 15px; left: 15px; font-size: 12px; opacity: 0.85; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 5px; border: 1px solid #113355; }
+        canvas { display: block; width: 100vw; height: 100vh; position: fixed; top: 0; left: 0; z-index: 1; }
+        #ui { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 10; background: rgba(5, 11, 20, 0.9); padding: 12px; border: 1px solid #00f3ff; border-radius: 8px; box-shadow: 0 0 15px rgba(0,243,255,0.3); max-width: 300px; margin: 0 auto; }
+        h1 { font-size: 13px; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 1px; text-align: center; }
+        button { background: transparent; color: #00f3ff; border: 1px solid #00f3ff; padding: 6px 10px; margin: 4px 0; cursor: pointer; border-radius: 4px; display: block; width: 100%; font-weight: bold; font-size: 12px; }
+        button:active { background: #00f3ff; color: #050b14; }
+        #instructions { position: absolute; bottom: 10px; left: 10px; right: 10px; font-size: 11px; opacity: 0.85; background: rgba(0,0,0,0.8); padding: 8px; border-radius: 5px; border: 1px solid #113355; text-align: center; z-index: 10; }
     </style>
 </head>
 <body>
     <div id="ui">
-        <h1>BMW M4 Blueprint & Engine</h1>
+        <h1>BMW M4 Blueprint</h1>
         <button id="explodeBtn">Toggle Exploded View (আলাদা করা)</button>
         <button id="engineBtn">Toggle Engine Working (ইঞ্জিন চালু)</button>
-        <button id="wireframeBtn">Toggle Wireframe Mode (ব্লুপ্রিন্ট)</button>
+        <button id="wireframeBtn">Toggle Wireframe (ব্লুপ্রিন্ট)</button>
     </div>
-    <div id="instructions">🖱️ মাউস ড্র্যাগ করে ঘুরিয়ে দেখুন | স্ক্রোল করে জুম করুন | পাশের বাটনগুলো ব্যবহার করুন</div>
+    <div id="instructions">👉 আঙুল দিয়ে ড্র্যাগ করে ঘুরিয়ে দেখুন | জুম করুন</div>
 
     <!-- Three.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script>
-        // Scene setup
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x050b14);
         scene.fog = new THREE.FogExp2(0x050b14, 0.015);
@@ -35,17 +36,16 @@
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         document.body.appendChild(renderer.domElement);
 
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // Blueprint Grid background
         const gridHelper = new THREE.GridHelper(60, 60, 0x00f3ff, 0x113355);
         gridHelper.position.y = -1;
         scene.add(gridHelper);
 
-        // Lighting
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
@@ -53,7 +53,6 @@
         directionalLight.position.set(10, 25, 10);
         scene.add(directionalLight);
 
-        // Materials
         const blueprintMaterial = new THREE.MeshStandardMaterial({
             color: 0x00f3ff,
             wireframe: true,
@@ -80,29 +79,24 @@
             metalness: 0.9
         });
 
-        // Car Group
         const carGroup = new THREE.Group();
         scene.add(carGroup);
 
-        // Chassis / Body
         const bodyGeometry = new THREE.BoxGeometry(7.2, 1.8, 3.2);
         const bodyMesh = new THREE.Mesh(bodyGeometry, solidBlueprintMaterial);
         bodyMesh.position.set(0, 0.6, 0);
         carGroup.add(bodyMesh);
 
-        // Roof / Cabin
         const cabinGeometry = new THREE.BoxGeometry(3.6, 1.2, 2.8);
         const cabinMesh = new THREE.Mesh(cabinGeometry, blueprintMaterial);
         cabinMesh.position.set(-0.2, 1.8, 0);
         carGroup.add(cabinMesh);
 
-        // Grille
         const grilleGeo = new THREE.BoxGeometry(0.2, 0.8, 1.2);
         const grilleMesh = new THREE.Mesh(grilleGeo, pistonMaterial);
         grilleMesh.position.set(3.61, 0.5, 0);
         carGroup.add(grilleMesh);
 
-        // Wheels
         const wheels = [];
         const wheelGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.6, 24);
         wheelGeo.rotateX(Math.PI / 2);
@@ -121,7 +115,6 @@
             wheels.push(wheel);
         });
 
-        // Engine Block & Pistons (Front section)
         const engineGroup = new THREE.Group();
         engineGroup.position.set(1.8, 0.8, 0);
         carGroup.add(engineGroup);
@@ -130,7 +123,6 @@
         const blockMesh = new THREE.Mesh(blockGeo, engineMaterial);
         engineGroup.add(blockMesh);
 
-        // Pistons inside engine
         const pistons = [];
         for (let i = -0.5; i <= 0.5; i += 0.5) {
             const pistonGeo = new THREE.CylinderGeometry(0.2, 0.2, 0.8, 16);
@@ -140,12 +132,10 @@
             pistons.push(piston);
         }
 
-        // Interaction Controls
         let isExploded = false;
         let isEngineRunning = false;
         let wireframeMode = true;
 
-        // Exploded View Trigger
         document.getElementById('explodeBtn').addEventListener('click', () => {
             isExploded = !isExploded;
             const targetCabinY = isExploded ? 3.2 : 1.8;
@@ -168,35 +158,29 @@
             animateExplode();
         });
 
-        // Engine Toggle Trigger
         document.getElementById('engineBtn').addEventListener('click', () => {
             isEngineRunning = !isEngineRunning;
             document.getElementById('engineBtn').style.background = isEngineRunning ? '#00f3ff' : 'transparent';
             document.getElementById('engineBtn').style.color = isEngineRunning ? '#050b14' : '#00f3ff';
         });
 
-        // Wireframe Mode Toggle
         document.getElementById('wireframeBtn').addEventListener('click', () => {
             wireframeMode = !wireframeMode;
             blueprintMaterial.wireframe = wireframeMode;
             solidBlueprintMaterial.wireframe = wireframeMode;
         });
 
-        // Resize handler
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Main Animation Loop
         let clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
-
             const elapsedTime = clock.getElapsedTime();
 
-            // Engine working simulation (pistons moving up & down)
             if (isEngineRunning) {
                 pistons.forEach((piston, index) => {
                     piston.position.y = 0.7 + Math.sin(elapsedTime * 18 + index) * 0.35;
